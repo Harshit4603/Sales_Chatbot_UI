@@ -418,7 +418,8 @@ if st.session_state.initialized:
 
     # ── Input ──
     if prompt := st.chat_input("Ask me anything about products, pricing, or deals..."):
-        now = datetime.datetime.now().strftime("%I:%M %p")
+        # Use IST (UTC+5:30)
+        now = (datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)).strftime("%I:%M %p")
 
         st.session_state.messages.append({
             "role": "user", "content": prompt, "time": now,
@@ -444,7 +445,7 @@ if st.session_state.initialized and len(st.session_state.messages) > 0:
         st.session_state.messages.append({
             "role"            : "assistant",
             "content"         : answer,
-            "time"            : datetime.datetime.now().strftime("%I:%M %p"),
+            "time"            : (datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)).strftime("%I:%M %p"),
             "db_sources"      : db_sources,
             "internet_sources": internet_sources,
         })

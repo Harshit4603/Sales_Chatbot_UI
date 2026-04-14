@@ -7,7 +7,7 @@ import datetime
 # =========================
 # CONFIGURATION
 # =========================
-BACKEND_URL = "https://web-production-498498.up.railway.app"   # Your FastAPI URL
+BACKEND_URL = "https://sales-chatbot-7wsa.onrender.com"   # Your FastAPI URL
 EMPLOYEE_ID = "EMP001"                   # Replace with real login later
 
 # ── helpers ──────────────────────────────────────────────────────────────────

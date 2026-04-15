@@ -98,7 +98,7 @@ function rateMsg(btn, type, messageId, msgIdx) {
     btn.classList.add('ripple');
     setTimeout(function(){ btn.classList.remove('ripple'); }, 450);
     
-    const rating = (type === 'up') ? "thumbs_up" : "thumbs_down";
+    const rating = (type === 'up') ? "yes" : "no";
     
     if (type === 'up') {
         btn.classList.add('liked','liked-anim');
@@ -511,8 +511,8 @@ if st.session_state.initialized:
                 count = len(db_sources) + len(internet_sources)
                 source_cards_html = f'<details class="sources-section"><summary class="sources-toggle">View Sources ({count})</summary><div style="margin-top:6px">{cards}</div></details>'
 
-            up_class   = "liked"    if rating == "thumbs_up"   else ""
-            down_class = "disliked" if rating == "thumbs_down" else ""
+            up_class   = "liked"    if rating == "yes"   else ""
+            down_class = "disliked" if rating == "no" else ""
 
             # Get message_id
             m_id = msg.get("message_id", "None")

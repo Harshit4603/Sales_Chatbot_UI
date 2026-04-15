@@ -455,13 +455,13 @@ if st.session_state.initialized:
                 up_type = "primary" if rating == "yes" else "secondary"
                 if st.button("👍", key=f"up_{i}", type=up_type):
                     st.session_state.ratings[i] = "yes"
-                    rate_message(st.session_state.message_ids.get(i), "yes")
+                    rate_message(st.session_state.message_ids.get(i), "thumbs_up") 
                     st.rerun()
             with col_dn:
                 dn_type = "primary" if rating == "no" else "secondary"
                 if st.button("👎", key=f"dn_{i}", type=dn_type):
                     st.session_state.ratings[i] = "no"
-                    rate_message(st.session_state.message_ids.get(i), "no")
+                    rate_message(st.session_state.message_ids.get(i), "thumbs_down")  
                     st.rerun()
 
             # Suggested chips after last bot message
@@ -513,17 +513,6 @@ if st.session_state.initialized and len(st.session_state.messages) > 0:
             "db_sources"      : db_sources,
             "internet_sources": internet_sources,
             "message_id"      : message_id,
-        })
-
-        # Store message_id so rating buttons can call /rate endpoint
-        st.session_state.message_ids[idx] = message_id
-        st.session_state.ratings[idx]     = None
-        st.rerun()
-        st.session_state.messages.append({
-            "content"         : answer,
-            "time"            : datetime.datetime.now(IST).strftime("%I:%M %p"),
-            "db_sources"      : db_sources,
-            "internet_sources": internet_sources,
         })
 
         # Store message_id so rating buttons can call /rate endpoint

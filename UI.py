@@ -55,19 +55,6 @@ def send_message(query: str) -> dict:
     except Exception as e:
         return {"answer": f"Error connecting to server: {e}", "db_sources": [], "internet_sources": [], "message_id": None}
 
-def rate_message(message_id: str, rating: str):
-    """PATCH /chat/{message_id}/rate"""
-    if not message_id:
-        return
-    try:
-        requests.patch(
-            f"{BACKEND_URL}/chat/{message_id}/rate",
-            json={"rating": rating},
-            timeout=10
-        )
-    except Exception:
-        pass
-
 # ── Google Fonts + global CSS ─────────────────────────────────────────────────
 
 GLOBAL_CSS = """
@@ -102,7 +89,7 @@ body { font-family: var(--font-sans); }
 
 SCRIPTS = """
 <script>
-function rateMsg(btn, type, msgIdx) {
+function rateMsg(btn, type, messageId) {
     var row = btn.parentElement;
     row.querySelectorAll('.rate-btn').forEach(function(b){
         b.classList.remove('liked','disliked','liked-anim','disliked-anim','ripple');
@@ -119,9 +106,8 @@ function rateMsg(btn, type, msgIdx) {
     }
     setTimeout(function(){ btn.classList.remove('liked-anim','disliked-anim'); }, 500);
 
-    const messageId = window.messageIds[msgIdx];
-    if (!messageId) {
-        console.error("No message_id found for index:", msgIdx);
+    if (!messageId || messageId === 'None') {
+        console.error("No valid message_id provided for rating");
         return;
     }
 
@@ -463,7 +449,6 @@ if st.session_state.initialized:
     st.markdown(
         f"""
         <script>
-            window.messageIds = {json.dumps(st.session_state.message_ids)};
             window.backendUrl = "{BACKEND_URL}";
         </script>
         """,
@@ -519,6 +504,9 @@ if st.session_state.initialized:
             up_class   = "liked"    if rating == "up"   else ""
             down_class = "disliked" if rating == "down" else ""
 
+            # Get message_id
+            m_id = msg.get("message_id", "None")
+
             bot_bubble_html = f"""
 <div class="msg-row-bot">
 <div class="bot-mini-avatar">&#9672;</div>
@@ -530,8 +518,8 @@ if st.session_state.initialized:
 <div class="bubble-meta"><span class="bubble-time">{ts}</span></div>
 <div class="rating-row">
   <span class="rating-label">Was this helpful?</span>
-  <button class="rate-btn {up_class}" onclick="rateMsg(this,'up',{i})">&#128077; Yes</button>
-  <button class="rate-btn {down_class}" onclick="rateMsg(this,'down',{i})">&#128078; No</button>
+  <button class="rate-btn {up_class}" onclick="rateMsg(this,'up','{m_id}')">&#128077; Yes</button>
+  <button class="rate-btn {down_class}" onclick="rateMsg(this,'down','{m_id}')">&#128078; No</button>
 </div>
 </div>
 </div>"""
@@ -585,9 +573,10 @@ if st.session_state.initialized and len(st.session_state.messages) > 0:
             "time"            : datetime.datetime.now(IST).strftime("%I:%M %p"),
             "db_sources"      : db_sources,
             "internet_sources": internet_sources,
+            "message_id"      : message_id, # Store ID directly here
         })
 
-        # Store message_id so rating buttons can call /rate endpoint
+        # Keep legacy store just in case
         st.session_state.message_ids[idx] = message_id
         st.session_state.ratings[idx]     = None
         st.rerun()

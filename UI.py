@@ -89,7 +89,7 @@ body { font-family: var(--font-sans); }
 
 SCRIPTS = """
 <script>
-function rateMsg(btn, type, messageId) {
+function rateMsg(btn, type, messageId, msgIdx) {
     var row = btn.parentElement;
     row.querySelectorAll('.rate-btn').forEach(function(b){
         b.classList.remove('liked','disliked','liked-anim','disliked-anim','ripple');
@@ -97,6 +97,9 @@ function rateMsg(btn, type, messageId) {
     void btn.offsetWidth;
     btn.classList.add('ripple');
     setTimeout(function(){ btn.classList.remove('ripple'); }, 450);
+    
+    const rating = (type === 'up') ? "thumbs_up" : "thumbs_down";
+    
     if (type === 'up') {
         btn.classList.add('liked','liked-anim');
         showToast('Thanks for the feedback! 👍');
@@ -107,29 +110,16 @@ function rateMsg(btn, type, messageId) {
     setTimeout(function(){ btn.classList.remove('liked-anim','disliked-anim'); }, 500);
 
     if (!messageId || messageId === 'None') {
-        console.error("No valid message_id provided for rating");
+        console.error("No valid message_id provided");
         return;
     }
 
-    console.log(`Sending ${type} rating for message ${messageId}`);
-
-    fetch(`${window.backendUrl}/chat/${messageId}/rate`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            rating: type === 'up' ? "thumbs_up" : "thumbs_down"
-        })
-    })
-    .then(response => {
-        if (!response.ok) {
-            console.error("Failed to register rating:", response.statusText);
-        } else {
-            console.log("Rating registered successfully!");
-        }
-    })
-    .catch(error => {
-        console.error("Error sending rating:", error);
-    });
+    // Trigger Streamlit rerun with query params to handle the rating in Python
+    const url = new URL(window.location.href);
+    url.searchParams.set("rate_id", messageId);
+    url.searchParams.set("rate_type", rating);
+    url.searchParams.set("rate_idx", msgIdx);
+    window.parent.location.search = url.searchParams.toString();
 }
 function copyMsg(text) {
     navigator.clipboard.writeText(text).then(function(){ showToast('Copied ✓'); });
@@ -444,6 +434,26 @@ if not st.session_state.initialized:
 # ── CHAT SCREEN ───────────────────────────────────────────────────────────────
 
 if st.session_state.initialized:
+    # ── RATING HANDLER ──
+    # Catch parameters from JS redirection to register in FastAPI & Session State
+    qparams = st.query_params
+    if "rate_id" in qparams and "rate_type" in qparams and "rate_idx" in qparams:
+        rid = qparams["rate_id"]
+        rtype = qparams["rate_type"]
+        rix = int(qparams["rate_idx"])
+        
+        # 1. Register in Database via FastAPI
+        try:
+            requests.patch(f"{BACKEND_URL}/chat/{rid}/rate", json={"rating": rtype}, timeout=5)
+        except Exception as e:
+            st.error(f"Failed to register rating: {e}")
+            
+        # 2. Update local UI state
+        st.session_state.ratings[rix] = rtype
+        
+        # 3. Clean URL and rerun
+        st.query_params.clear()
+        st.rerun()
 
     st.markdown(CHAT_CSS, unsafe_allow_html=True)
     st.markdown(
@@ -501,8 +511,8 @@ if st.session_state.initialized:
                 count = len(db_sources) + len(internet_sources)
                 source_cards_html = f'<details class="sources-section"><summary class="sources-toggle">View Sources ({count})</summary><div style="margin-top:6px">{cards}</div></details>'
 
-            up_class   = "liked"    if rating == "up"   else ""
-            down_class = "disliked" if rating == "down" else ""
+            up_class   = "liked"    if rating == "thumbs_up"   else ""
+            down_class = "disliked" if rating == "thumbs_down" else ""
 
             # Get message_id
             m_id = msg.get("message_id", "None")
@@ -518,8 +528,8 @@ if st.session_state.initialized:
 <div class="bubble-meta"><span class="bubble-time">{ts}</span></div>
 <div class="rating-row">
   <span class="rating-label">Was this helpful?</span>
-  <button class="rate-btn {up_class}" onclick="rateMsg(this,'up','{m_id}')">&#128077; Yes</button>
-  <button class="rate-btn {down_class}" onclick="rateMsg(this,'down','{m_id}')">&#128078; No</button>
+  <button class="rate-btn {up_class}" onclick="rateMsg(this,'up','{m_id}', {i})">&#128077; Yes</button>
+  <button class="rate-btn {down_class}" onclick="rateMsg(this,'down','{m_id}', {i})">&#128078; No</button>
 </div>
 </div>
 </div>"""

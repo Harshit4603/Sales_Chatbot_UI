@@ -96,6 +96,7 @@ GLOBAL_CSS = """
 }
 
 body { font-family: var(--font-sans); }
+@keyframes dot-p{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:1;transform:scale(1.45)}}
 """
 
 # ── Loading Screen CSS ────────────────────────────────────────────────────────
@@ -177,7 +178,51 @@ LOADING_CSS = """
     50%      { opacity:1;  transform:scale(1.45);}
 }
 @keyframes fade-up { to { opacity:1; transform:translateY(0); } }
+
 </style>
+
+<script>
+function rateMsg(btn, type, msgIdx) {
+    var row = btn.parentElement;
+    row.querySelectorAll('.rate-btn').forEach(function(b){
+        b.classList.remove('liked','disliked','liked-anim','disliked-anim','ripple');
+    });
+    void btn.offsetWidth;
+    btn.classList.add('ripple');
+    setTimeout(function(){ btn.classList.remove('ripple'); }, 450);
+    if (type === 'up') {
+        btn.classList.add('liked','liked-anim');
+        showToast('Thanks for the feedback! 👍');
+    } else {
+        btn.classList.add('disliked','disliked-anim');
+        showToast("We'll keep improving 🙏");
+    }
+    setTimeout(function(){ btn.classList.remove('liked-anim','disliked-anim'); }, 500);
+}
+function copyMsg(text) {
+    navigator.clipboard.writeText(text).then(function(){ showToast('Copied ✓'); });
+}
+function showToast(msg) {
+    var old = document.querySelector('.feedback-toast');
+    if (old) old.remove();
+    var t = document.createElement('div');
+    t.className = 'feedback-toast'; t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function(){ t.remove(); }, 2000);
+}
+function sendChip(text) {
+    var inp = parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]') || document.querySelector('textarea');
+    if (!inp) return;
+    var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(inp, text);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    setTimeout(function(){
+        var form = inp.closest('form');
+        var btn = form ? form.querySelector('button[type="submit"]') : inp.parentElement.querySelector('button');
+        if (btn) btn.click();
+    }, 80);
+}
+</script>
 """
 
 # ── Chat Screen CSS ───────────────────────────────────────────────────────────
@@ -191,10 +236,21 @@ CHAT_CSS = """
 }
 
 .sa-header {
-    background: var(--navy); padding: 18px 28px 14px;
-    display: flex; align-items: center; gap: 14px;
+    background: var(--navy); padding: 14px 28px;
+    display: flex; align-items: center; justify-content: space-between;
     position: sticky; top: 0; z-index: 100;
+    border-bottom: 1px solid rgba(99,179,237,0.08);
 }
+.sa-header-left { display:flex;align-items:center;gap:14px; }
+.sa-header-actions { display:flex;gap:8px; }
+.sa-pill {
+    font-family: var(--font-sans); font-size: .68rem; padding: 5px 12px;
+    border-radius: 20px; background: rgba(99,179,237,0.1);
+    border: .5px solid rgba(99,179,237,0.22); color: var(--accent);
+    cursor: pointer; transition: background .18s, transform .12s; user-select: none;
+}
+.sa-pill:hover { background: rgba(99,179,237,0.18); transform: translateY(-1px); }
+.sa-pill:active { transform: scale(0.96); }
 .sa-avatar {
     width: 40px; height: 40px; border-radius: 50%;
     background: rgba(99,179,237,0.12);
@@ -232,6 +288,12 @@ CHAT_CSS = """
 }
 @keyframes slide-left  { from { opacity:0; transform:translateX(-12px);} to {opacity:1;transform:translateX(0);}}
 @keyframes slide-right { from { opacity:0; transform:translateX(12px); } to {opacity:1;transform:translateX(0);}}
+/* TYPING INDICATOR */
+.typing-bubble { display:flex;gap:10px;align-items:flex-end;margin-bottom:6px;animation:slide-left .3s ease; }
+.typing-dots { background:var(--bubble-bot);border:.5px solid var(--border);border-radius:18px 18px 18px 4px;padding:14px 18px;display:flex;align-items:center;gap:5px; }
+.typing-dots span { width:7px;height:7px;border-radius:50%;background:var(--muted);display:inline-block;animation:typing-bounce 1.2s ease-in-out infinite; }
+.typing-dots span:nth-child(2){animation-delay:.18s;}.typing-dots span:nth-child(3){animation-delay:.36s;}
+@keyframes typing-bounce { 0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-6px);opacity:1} }
 
 .bot-mini-avatar {
     width: 30px; height: 30px; border-radius: 50%;
@@ -259,25 +321,42 @@ CHAT_CSS = """
 
 /* sources badge */
 .sources-row { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 5px; }
-.source-badge {
-    font-family: var(--font-sans); font-size: .62rem;
-    background: #EFF6FF; border: .5px solid #BFDBFE;
-    color: #1D4ED8; border-radius: 20px; padding: 2px 9px;
-    text-decoration: none; white-space: nowrap;
-}
-.source-badge.db { background:#F0FDF4; border-color:#BBF7D0; color:#15803D; }
-
-.rate-btns { display: flex; gap: 5px; }
-.rate-btn {
-    width: 26px; height: 26px; border-radius: 50%;
-    border: .5px solid rgba(0,0,0,0.13); background: white;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 12px;
-    transition: transform .15s, background .15s; padding: 0;
-}
-.rate-btn:hover { transform: scale(1.18); background:#f0f4ff; }
-.rate-btn.liked    { background:#e8f5e9; border-color: var(--green); }
-.rate-btn.disliked { background:#fff3f3; border-color: var(--red);   }
+/* SOURCE CARDS */
+.sources-section { margin-top:10px; }
+.sources-toggle { font-family:var(--font-sans);font-size:.72rem;font-weight:500;color:var(--accent2);cursor:pointer;display:flex;align-items:center;gap:5px;user-select:none;margin-bottom:6px;list-style:none; }
+.source-card { background:#FFFFFF;border:.5px solid rgba(0,0,0,0.07);border-radius:10px;padding:8px 12px;margin-bottom:5px;display:flex;align-items:flex-start;gap:9px;text-decoration:none;transition:border-color .15s,transform .15s; }
+.source-card:hover { border-color:rgba(59,130,246,0.3);transform:translateX(2px); }
+.source-icon { font-size:14px;flex-shrink:0;margin-top:1px; }
+.source-title { font-family:var(--font-sans);font-size:.72rem;font-weight:500;color:#1A2035;line-height:1.3; }
+.source-sub { font-family:var(--font-sans);font-size:.63rem;color:var(--muted);margin-top:1px; }
+/* COPY BUTTON */
+.bubble-bot-wrap:hover .copy-btn { opacity:1; }
+.copy-btn { position:absolute;top:8px;right:10px;background:rgba(240,242,248,0.95);border:.5px solid rgba(0,0,0,0.1);border-radius:6px;padding:2px 7px;font-size:.6rem;color:var(--muted);cursor:pointer;opacity:0;transition:opacity .2s;font-family:var(--font-sans); }
+.copy-btn:hover { color:var(--navy2); }
+/* RATING ROW */
+.rating-row { display:flex;align-items:center;gap:8px;margin-top:7px;padding:0 2px; }
+.rating-label { font-family:var(--font-sans);font-size:.66rem;color:var(--muted);font-weight:300; }
+.rate-btn { display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;border:.5px solid rgba(0,0,0,0.12);background:white;cursor:pointer;font-size:.7rem;font-family:var(--font-sans);color:var(--muted);transition:transform .15s,background .15s,border-color .15s;position:relative;overflow:hidden;user-select:none; }
+.rate-btn:hover { transform:scale(1.07); }
+.rate-btn:active { transform:scale(0.92); }
+.rate-btn::after { content:"";position:absolute;width:100%;height:100%;border-radius:20px;background:rgba(255,255,255,0.5);transform:scale(0);opacity:0;transition:transform 0s,opacity 0s;pointer-events:none; }
+.rate-btn.ripple::after { transform:scale(2.5);opacity:0;transition:transform .4s ease-out,opacity .4s ease-out; }
+.rate-btn.liked { background:#e8f5e9;border-color:var(--green);color:var(--green); }
+.rate-btn.liked-anim { animation:like-bounce .45s cubic-bezier(0.36,0.07,0.19,0.97),glow-pulse .6s ease-out; }
+.rate-btn.disliked { background:#fff3f3;border-color:var(--red);color:var(--red); }
+.rate-btn.disliked-anim { animation:dislike-shake .4s cubic-bezier(0.36,0.07,0.19,0.97); }
+@keyframes like-bounce { 0%{transform:scale(1)}25%{transform:scale(1.35) rotate(-8deg)}50%{transform:scale(0.88) rotate(5deg)}75%{transform:scale(1.12) rotate(-3deg)}100%{transform:scale(1) rotate(0deg)} }
+@keyframes glow-pulse { 0%{box-shadow:0 0 0 0 rgba(76,175,125,0.5)}50%{box-shadow:0 0 0 8px rgba(76,175,125,0.15)}100%{box-shadow:0 0 0 0 rgba(76,175,125,0)} }
+@keyframes dislike-shake { 0%{transform:translateX(0)}20%{transform:translateX(-4px) rotate(-3deg)}40%{transform:translateX(4px) rotate(3deg)}60%{transform:translateX(-3px) rotate(-2deg)}80%{transform:translateX(2px) rotate(1deg)}100%{transform:translateX(0)} }
+/* CHIPS */
+.chips-row { display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 6px 40px;animation:slide-left .4s ease .1s both; }
+.chip { font-family:var(--font-sans);font-size:.7rem;padding:5px 12px;border-radius:20px;background:white;border:.5px solid rgba(59,130,246,0.25);color:var(--accent2);cursor:pointer;transition:background .15s,transform .12s;white-space:nowrap; }
+.chip:hover { background:#EFF6FF;border-color:var(--accent2);transform:translateY(-1px); }
+.chip:active { transform:scale(0.96); }
+/* TOAST */
+.feedback-toast { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--navy2);color:var(--text);font-family:var(--font-sans);font-size:.75rem;font-weight:300;padding:8px 18px;border-radius:20px;z-index:999;pointer-events:none;animation:toast-in .3s ease,toast-out .3s ease 1.6s forwards; }
+@keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes toast-out{to{opacity:0;transform:translateX(-50%) translateY(10px)}}
 
 .stChatInput > div {
     border-radius: 28px !important;
@@ -353,13 +432,19 @@ if st.session_state.initialized:
     # Header
     st.markdown("""
     <div class="sa-header">
-        <div class="sa-avatar">◈</div>
-        <div>
-            <div class="sa-header-name">SalesAssist</div>
-            <div class="sa-status">
-                <div class="sa-status-dot"></div>
-                Online · Ready to help
+        <div class="sa-header-left">
+            <div class="sa-avatar">&#9672;</div>
+            <div>
+                <div class="sa-header-name">SalesAssist</div>
+                <div class="sa-status">
+                    <div class="sa-status-dot"></div>
+                    Online &middot; Ready to help
+                </div>
             </div>
+        </div>
+        <div class="sa-header-actions">
+            <div class="sa-pill" onclick="sendChip('Start a new topic')">+ New topic</div>
+            <div class="sa-pill" onclick="copyMsg(document.querySelector('.bubble-bot')?.innerText||'')">&#x2197; Copy last</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -376,60 +461,59 @@ if st.session_state.initialized:
             db_sources = msg.get("db_sources", [])
             internet_sources = msg.get("internet_sources", [])
             
-            # 1. Build Source Items
-            items_html = ""
-            for src in db_sources:
-                items_html += f'<li style="font-size: .72rem; color: #111827; margin-bottom: 4px;">📄 {src}</li>'
-            for src in internet_sources:
-                title = src.get("title", "Web")
-                url = src.get("url", "#")
-                items_html += f'<li style="font-size: .72rem; color: #111827; margin-bottom: 4px;">🌐 <a href="{url}" target="_blank" style="color: #3B82F6; text-decoration: none;">{title}</a></li>'
+            # Build source cards
+            source_cards_html = """"""
+            if db_sources or internet_sources:
+                cards = """"""
+                for src_item in db_sources:
+                    cards += f'<div class="source-card"><div class="source-icon">&#128196;</div><div><div class="source-title">{src_item}</div><div class="source-sub">Internal knowledge base</div></div></div>'
+                for src_item in internet_sources:
+                    stitle = src_item.get("title", "Web source")
+                    surl   = src_item.get("url", "#")
+                    short_url = surl[:45] + ("..." if len(surl) > 45 else "")
+                    cards += f'<a class="source-card" href="{surl}" target="_blank"><div class="source-icon">&#127760;</div><div><div class="source-title">{stitle}</div><div class="source-sub">{short_url}</div></div></a>'
+                count = len(db_sources) + len(internet_sources)
+                source_cards_html = f'<details class="sources-section"><summary class="sources-toggle">View Sources ({count})</summary><div style="margin-top:6px">{cards}</div></details>'
 
-            # 2. Build Sources Dropdown (FLUSH LEFT)
-            sources_html = ""
-            if items_html:
-                sources_html = f"""
-<details style="margin-top: 10px; cursor: pointer;">
-<summary style="font-size: .75rem; color: #3B82F6; font-weight: 500;">◈ View Sources</summary>
-<ul style="margin-top: 8px; padding-left: 15px; list-style-type: none;">
-{items_html}
-</ul>
-</details>"""
+            up_class   = "liked"    if rating == "up"   else ""
+            down_class = "disliked" if rating == "down" else ""
 
-            # 3. Main Message Bubble (FLUSH LEFT)
-            # This must stay at the far left margin to avoid code blocks
             bot_bubble_html = f"""
 <div class="msg-row-bot">
-<div class="bot-mini-avatar">◈</div>
+<div class="bot-mini-avatar">&#9672;</div>
 <div class="bubble-bot-wrap">
-<div class="bubble-bot">{content}</div>
-{sources_html}
-<div class="bubble-meta">
-<span class="bubble-time">{ts}</span>
+<div class="bubble-bot" style="position:relative">
+<div class="copy-btn" onclick="copyMsg(this.closest('.bubble-bot').innerText.replace(this.innerText,'').trim())">copy</div>
+{content}</div>
+{source_cards_html}
+<div class="bubble-meta"><span class="bubble-time">{ts}</span></div>
+<div class="rating-row">
+  <span class="rating-label">Was this helpful?</span>
+  <button class="rate-btn {up_class}" onclick="rateMsg(this,'up',{i})">&#128077; Yes</button>
+  <button class="rate-btn {down_class}" onclick="rateMsg(this,'down',{i})">&#128078; No</button>
 </div>
 </div>
 </div>"""
             st.markdown(bot_bubble_html, unsafe_allow_html=True)
 
-            # 4. Rating buttons
+            # Streamlit hidden buttons for backend rating calls
             col_gap, col_up, col_dn, col_rest = st.columns([6, 0.45, 0.45, 3])
             with col_up:
-                up_type = "primary" if rating == "up" else "secondary"
-                if st.button("👍", key=f"up_{i}", type=up_type):
+                if st.button("👍", key=f"up_{i}", type="secondary"):
                     st.session_state.ratings[i] = "up"
                     rate_message(st.session_state.message_ids.get(i), "thumbs_up")
                     st.rerun()
-                if rating == "up":
-                    st.markdown(f'<style>button[key="up_{i}"] {{ background-color: #3B82F6 !important; color: white !important; border: none !important; }}</style>', unsafe_allow_html=True)
-
             with col_dn:
-                dn_type = "primary" if rating == "down" else "secondary"
-                if st.button("👎", key=f"dn_{i}", type=dn_type):
+                if st.button("👎", key=f"dn_{i}", type="secondary"):
                     st.session_state.ratings[i] = "down"
                     rate_message(st.session_state.message_ids.get(i), "thumbs_down")
                     st.rerun()
-                if rating == "down":
-                    st.markdown(f'<style>button[key="dn_{i}"] {{ background-color: #EF5350 !important; color: white !important; border: none !important; }}</style>', unsafe_allow_html=True)
+
+            # Suggested chips after last bot message
+            if i == len(st.session_state.messages) - 1:
+                CHIP_LABELS = ["Show pricing breakdown", "Compare with competitor", "Draft a follow-up email", "Summarise key benefits"]
+                chips_markup = "".join(f'<div class="chip" onclick="sendChip(\'{c}\')">{c}</div>' for c in CHIP_LABELS)
+                st.markdown(f'<div class="chips-row">{chips_markup}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f"""
             <div class="msg-row-user">
@@ -454,8 +538,11 @@ if st.session_state.initialized and len(st.session_state.messages) > 0:
     last_msg = st.session_state.messages[-1]
 
     if last_msg["role"] == "user":
-        with st.spinner("Analyzing request..."):
-            data = send_message(last_msg["content"])
+        typing_ph = st.empty()
+        with typing_ph:
+            st.markdown('<div class="chat-area" style="padding-top:0;padding-bottom:0;"><div class="typing-bubble"><div class="bot-mini-avatar">&#9672;</div><div class="typing-dots"><span></span><span></span><span></span></div></div></div>', unsafe_allow_html=True)
+        data = send_message(last_msg["content"])
+        typing_ph.empty()
 
         answer           = data.get("answer", "Sorry, something went wrong.")
         db_sources       = data.get("db_sources", [])

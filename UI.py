@@ -477,19 +477,19 @@ if st.session_state.initialized:
 
             # Suggested chips after last bot message
             # NEW - Native Streamlit buttons, guaranteed to work
-        if i == len(st.session_state.messages) - 1:
-            followups = [c.replace("'", "") for c in msg.get("followups", [])]
-            if followups:
-                cols = st.columns(len(followups))
-                for col, suggestion in zip(cols, followups):
-                    with col:
-                        if st.button(suggestion, key=f"chip_{i}_{suggestion}"):
-                            st.session_state.messages.append({
-                                "role": "user",
-                                "content": suggestion,
-                                "time": datetime.datetime.now(IST).strftime("%I:%M %p")
-                            })
-                            st.rerun()
+            if i == len(st.session_state.messages) - 1:
+                followups = [c.replace("'", "") for c in msg.get("followups", [])]
+                if followups:
+                    cols = st.columns(len(followups))
+                    for col, suggestion in zip(cols, followups):
+                        with col:
+                            if st.button(suggestion, key=f"chip_{i}_{suggestion}"):
+                                st.session_state.messages.append({
+                                    "role": "user",
+                                    "content": suggestion,
+                                    "time": datetime.datetime.now(IST).strftime("%I:%M %p")
+                                })
+                                st.rerun()
         else:
             st.markdown(f"""
             <div class="msg-row-user">
@@ -509,14 +509,21 @@ if prompt := st.chat_input("Ask me anything..."):
 
 # ── Generate response after rerun ────────────────────────────────────────────
 
+if "pending_response" not in st.session_state:
+    st.session_state.pending_response = False
+
 if st.session_state.initialized and len(st.session_state.messages) > 0:
     last_msg = st.session_state.messages[-1]
 
-    if last_msg["role"] == "user":
+    if last_msg["role"] == "user" and not st.session_state.pending_response:
+        st.session_state.pending_response = True
+        st.rerun()  # rerun FIRST so user bubble renders, THEN process
+
+    if last_msg["role"] == "user" and st.session_state.pending_response:
         typing_ph = st.empty()
         with typing_ph:
             st.markdown('<div class="chat-area" style="padding-top:0;padding-bottom:0;"><div class="typing-bubble"><div class="bot-mini-avatar">◈</div><div class="typing-dots"><span></span><span></span><span></span></div></div></div>', unsafe_allow_html=True)
-        
+
         data = send_message(last_msg["content"])
         typing_ph.empty()
 
@@ -524,20 +531,19 @@ if st.session_state.initialized and len(st.session_state.messages) > 0:
         db_sources       = data.get("db_sources", [])
         internet_sources = data.get("internet_sources", [])
         message_id       = data.get("message_id")
-
-        idx = len(st.session_state.messages)
+        idx              = len(st.session_state.messages)
 
         st.session_state.messages.append({
-    "role"            : "assistant",
-    "content"         : answer,
-    "time"            : datetime.datetime.now(IST).strftime("%I:%M %p"),
-    "db_sources"      : db_sources,
-    "internet_sources": internet_sources,
-    "message_id"      : message_id,
-    "followups"       : data.get("followups", []),   # ← add this
-})
+            "role"            : "assistant",
+            "content"         : answer,
+            "time"            : datetime.datetime.now(IST).strftime("%I:%M %p"),
+            "db_sources"      : db_sources,
+            "internet_sources": internet_sources,
+            "message_id"      : message_id,
+            "followups"       : data.get("followups", []),
+        })
 
-        # Store message_id so rating buttons can call /rate endpoint
         st.session_state.message_ids[idx] = message_id
         st.session_state.ratings[idx]     = None
+        st.session_state.pending_response = False
         st.rerun()

@@ -476,10 +476,20 @@ if st.session_state.initialized:
                     st.rerun()
 
             # Suggested chips after last bot message
-            if i == len(st.session_state.messages) - 1:
-                CHIP_LABELS = msg.get("followups", [])
-                chips_markup = "".join(f'<div class="chip" onclick="sendChip(\'{c}\')">{c}</div>' for c in CHIP_LABELS)
-                st.markdown(f'<div class="chips-row">{chips_markup}</div>', unsafe_allow_html=True)
+            # NEW - Native Streamlit buttons, guaranteed to work
+        if i == len(st.session_state.messages) - 1:
+            followups = [c.replace("'", "") for c in msg.get("followups", [])]
+            if followups:
+                cols = st.columns(len(followups))
+                for col, suggestion in zip(cols, followups):
+                    with col:
+                        if st.button(suggestion, key=f"chip_{i}_{suggestion}"):
+                            st.session_state.messages.append({
+                                "role": "user",
+                                "content": suggestion,
+                                "time": datetime.datetime.now(IST).strftime("%I:%M %p")
+                            })
+                            st.rerun()
         else:
             st.markdown(f"""
             <div class="msg-row-user">

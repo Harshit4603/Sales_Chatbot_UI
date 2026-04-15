@@ -438,19 +438,28 @@ if st.session_state.initialized:
     # Catch parameters from JS redirection to register in FastAPI & Session State
     qparams = st.query_params
     if "rate_id" in qparams and "rate_type" in qparams and "rate_idx" in qparams:
-        rid = qparams["rate_id"]
-        rtype = qparams["rate_type"]
-        rix = int(qparams["rate_idx"])
-        
-        # 1. Register in Database via FastAPI
         try:
-            requests.patch(f"{BACKEND_URL}/chat/{rid}/rate", json={"rating": rtype}, timeout=5)
+            # Handle both string and list types (Streamlit varies by version)
+            rid   = qparams["rate_id"]
+            rtype = qparams["rate_type"]
+            rix_raw = qparams["rate_idx"]
+            
+            if isinstance(rid, list): rid = rid[0]
+            if isinstance(rtype, list): rtype = rtype[0]
+            if isinstance(rix_raw, list): rix_raw = rix_raw[0]
+            
+            rix = int(rix_raw)
+            
+            # 1. Register in Database via FastAPI
+            resp = requests.patch(f"{BACKEND_URL}/chat/{rid}/rate", json={"rating": rtype}, timeout=5)
+            resp.raise_for_status()
+            
+            # 2. Update local UI state
+            st.session_state.ratings[rix] = rtype
+            
         except Exception as e:
             st.error(f"Failed to register rating: {e}")
             
-        # 2. Update local UI state
-        st.session_state.ratings[rix] = rtype
-        
         # 3. Clean URL and rerun
         st.query_params.clear()
         st.rerun()

@@ -55,6 +55,19 @@ def send_message(query: str) -> dict:
     except Exception as e:
         return {"answer": f"Error connecting to server: {e}", "db_sources": [], "internet_sources": [], "message_id": None}
 
+def rate_message(message_id: str, rating: str):
+    """PATCH /chat/{message_id}/rate"""
+    if not message_id or message_id == "None":
+        return
+    try:
+        requests.patch(
+            f"{BACKEND_URL}/chat/{message_id}/rate",
+            json={"rating": rating},
+            timeout=10
+        )
+    except Exception:
+        pass
+
 # ── Google Fonts + global CSS ─────────────────────────────────────────────────
 
 GLOBAL_CSS = """
@@ -84,53 +97,18 @@ GLOBAL_CSS = """
 }
 
 body { font-family: var(--font-sans); }
-@keyframes dot-p{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:1;transform:scale(1.45)}}
 """
 
 SCRIPTS = """
 <script>
-function rateMsg(btn, type, messageId, msgIdx) {
-    var row = btn.parentElement;
-    row.querySelectorAll('.rate-btn').forEach(function(b){
-        b.classList.remove('liked','disliked','liked-anim','disliked-anim','ripple');
-    });
-    void btn.offsetWidth;
-    btn.classList.add('ripple');
-    setTimeout(function(){ btn.classList.remove('ripple'); }, 450);
-    
-    const rating = (type === 'up') ? "yes" : "no";
-    
-    if (type === 'up') {
-        btn.classList.add('liked','liked-anim');
-        showToast('Thanks for the feedback! 👍');
-    } else {
-        btn.classList.add('disliked','disliked-anim');
-        showToast("We'll keep improving 🙏");
-    }
-    setTimeout(function(){ btn.classList.remove('liked-anim','disliked-anim'); }, 500);
-
-    if (!messageId || messageId === 'None') {
-        console.error("No valid message_id provided");
-        return;
-    }
-
-    // Trigger Streamlit rerun with query params to handle the rating in Python
-    const url = new URL(window.location.href);
-    url.searchParams.set("rate_id", messageId);
-    url.searchParams.set("rate_type", rating);
-    url.searchParams.set("rate_idx", msgIdx);
-    window.parent.location.search = url.searchParams.toString();
-}
 function copyMsg(text) {
-    navigator.clipboard.writeText(text).then(function(){ showToast('Copied ✓'); });
-}
-function showToast(msg) {
-    var old = document.querySelector('.feedback-toast');
-    if (old) old.remove();
-    var t = document.createElement('div');
-    t.className = 'feedback-toast'; t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(function(){ t.remove(); }, 2000);
+    navigator.clipboard.writeText(text).then(function(){ 
+        var t = document.createElement('div');
+        t.style = "position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#111827;color:white;padding:8px 18px;border-radius:20px;z-index:999;font-size:.75rem;";
+        t.textContent = 'Copied ✓';
+        document.body.appendChild(t);
+        setTimeout(function(){ t.remove(); }, 2000);
+    });
 }
 function sendChip(text) {
     var inp = parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]') || document.querySelector('textarea');
@@ -226,7 +204,6 @@ LOADING_CSS = """
     50%      { opacity:1;  transform:scale(1.45);}
 }
 @keyframes fade-up { to { opacity:1; transform:translateY(0); } }
-
 </style>
 """
 
@@ -244,7 +221,6 @@ CHAT_CSS = """
     background: var(--navy); padding: 14px 28px;
     display: flex; align-items: center; justify-content: space-between;
     position: sticky; top: 0; z-index: 100;
-    border-bottom: 1px solid rgba(99,179,237,0.08);
 }
 .sa-header-left { display:flex;align-items:center;gap:14px; }
 .sa-header-actions { display:flex;gap:8px; }
@@ -255,7 +231,6 @@ CHAT_CSS = """
     cursor: pointer; transition: background .18s, transform .12s; user-select: none;
 }
 .sa-pill:hover { background: rgba(99,179,237,0.18); transform: translateY(-1px); }
-.sa-pill:active { transform: scale(0.96); }
 .sa-avatar {
     width: 40px; height: 40px; border-radius: 50%;
     background: rgba(99,179,237,0.12);
@@ -293,6 +268,7 @@ CHAT_CSS = """
 }
 @keyframes slide-left  { from { opacity:0; transform:translateX(-12px);} to {opacity:1;transform:translateX(0);}}
 @keyframes slide-right { from { opacity:0; transform:translateX(12px); } to {opacity:1;transform:translateX(0);}}
+
 /* TYPING INDICATOR */
 .typing-bubble { display:flex;gap:10px;align-items:flex-end;margin-bottom:6px;animation:slide-left .3s ease; }
 .typing-dots { background:var(--bubble-bot);border:.5px solid var(--border);border-radius:18px 18px 18px 4px;padding:14px 18px;display:flex;align-items:center;gap:5px; }
@@ -324,44 +300,19 @@ CHAT_CSS = """
 }
 .bubble-time { font-family: var(--font-sans); font-size: .65rem; color: var(--muted); }
 
-/* sources badge */
-.sources-row { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 5px; }
-/* SOURCE CARDS */
+/* SOURCES SECTION */
 .sources-section { margin-top:10px; }
-.sources-toggle { font-family:var(--font-sans);font-size:.72rem;font-weight:500;color:var(--accent2);cursor:pointer;display:flex;align-items:center;gap:5px;user-select:none;margin-bottom:6px;list-style:none; }
+.sources-toggle { font-family:var(--font-sans);font-size:.75rem;font-weight:500;color:var(--accent2);cursor:pointer;display:flex;align-items:center;gap:5px;user-select:none;margin-bottom:6px;list-style:none; }
 .source-card { background:#FFFFFF;border:.5px solid rgba(0,0,0,0.07);border-radius:10px;padding:8px 12px;margin-bottom:5px;display:flex;align-items:flex-start;gap:9px;text-decoration:none;transition:border-color .15s,transform .15s; }
 .source-card:hover { border-color:rgba(59,130,246,0.3);transform:translateX(2px); }
 .source-icon { font-size:14px;flex-shrink:0;margin-top:1px; }
 .source-title { font-family:var(--font-sans);font-size:.72rem;font-weight:500;color:#1A2035;line-height:1.3; }
 .source-sub { font-family:var(--font-sans);font-size:.63rem;color:var(--muted);margin-top:1px; }
-/* COPY BUTTON */
-.bubble-bot-wrap:hover .copy-btn { opacity:1; }
-.copy-btn { position:absolute;top:8px;right:10px;background:rgba(240,242,248,0.95);border:.5px solid rgba(0,0,0,0.1);border-radius:6px;padding:2px 7px;font-size:.6rem;color:var(--muted);cursor:pointer;opacity:0;transition:opacity .2s;font-family:var(--font-sans); }
-.copy-btn:hover { color:var(--navy2); }
-/* RATING ROW */
-.rating-row { display:flex;align-items:center;gap:8px;margin-top:7px;padding:0 2px; }
-.rating-label { font-family:var(--font-sans);font-size:.66rem;color:var(--muted);font-weight:300; }
-.rate-btn { display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;border:.5px solid rgba(0,0,0,0.12);background:white;cursor:pointer;font-size:.7rem;font-family:var(--font-sans);color:var(--muted);transition:transform .15s,background .15s,border-color .15s;position:relative;overflow:hidden;user-select:none; }
-.rate-btn:hover { transform:scale(1.07); }
-.rate-btn:active { transform:scale(0.92); }
-.rate-btn::after { content:"";position:absolute;width:100%;height:100%;border-radius:20px;background:rgba(255,255,255,0.5);transform:scale(0);opacity:0;transition:transform 0s,opacity 0s;pointer-events:none; }
-.rate-btn.ripple::after { transform:scale(2.5);opacity:0;transition:transform .4s ease-out,opacity .4s ease-out; }
-.rate-btn.liked { background:#e8f5e9;border-color:var(--green);color:var(--green); }
-.rate-btn.liked-anim { animation:like-bounce .45s cubic-bezier(0.36,0.07,0.19,0.97),glow-pulse .6s ease-out; }
-.rate-btn.disliked { background:#fff3f3;border-color:var(--red);color:var(--red); }
-.rate-btn.disliked-anim { animation:dislike-shake .4s cubic-bezier(0.36,0.07,0.19,0.97); }
-@keyframes like-bounce { 0%{transform:scale(1)}25%{transform:scale(1.35) rotate(-8deg)}50%{transform:scale(0.88) rotate(5deg)}75%{transform:scale(1.12) rotate(-3deg)}100%{transform:scale(1) rotate(0deg)} }
-@keyframes glow-pulse { 0%{box-shadow:0 0 0 0 rgba(76,175,125,0.5)}50%{box-shadow:0 0 0 8px rgba(76,175,125,0.15)}100%{box-shadow:0 0 0 0 rgba(76,175,125,0)} }
-@keyframes dislike-shake { 0%{transform:translateX(0)}20%{transform:translateX(-4px) rotate(-3deg)}40%{transform:translateX(4px) rotate(3deg)}60%{transform:translateX(-3px) rotate(-2deg)}80%{transform:translateX(2px) rotate(1deg)}100%{transform:translateX(0)} }
+
 /* CHIPS */
 .chips-row { display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 6px 40px;animation:slide-left .4s ease .1s both; }
 .chip { font-family:var(--font-sans);font-size:.7rem;padding:5px 12px;border-radius:20px;background:white;border:.5px solid rgba(59,130,246,0.25);color:var(--accent2);cursor:pointer;transition:background .15s,transform .12s;white-space:nowrap; }
 .chip:hover { background:#EFF6FF;border-color:var(--accent2);transform:translateY(-1px); }
-.chip:active { transform:scale(0.96); }
-/* TOAST */
-.feedback-toast { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--navy2);color:var(--text);font-family:var(--font-sans);font-size:.75rem;font-weight:300;padding:8px 18px;border-radius:20px;z-index:999;pointer-events:none;animation:toast-in .3s ease,toast-out .3s ease 1.6s forwards; }
-@keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-@keyframes toast-out{to{opacity:0;transform:translateX(-50%) translateY(10px)}}
 
 .stChatInput > div {
     border-radius: 28px !important;
@@ -434,51 +385,14 @@ if not st.session_state.initialized:
 # ── CHAT SCREEN ───────────────────────────────────────────────────────────────
 
 if st.session_state.initialized:
-    # ── RATING HANDLER ──
-    # Catch parameters from JS redirection to register in FastAPI & Session State
-    qparams = st.query_params
-    if "rate_id" in qparams and "rate_type" in qparams and "rate_idx" in qparams:
-        try:
-            # Handle both string and list types (Streamlit varies by version)
-            rid   = qparams["rate_id"]
-            rtype = qparams["rate_type"]
-            rix_raw = qparams["rate_idx"]
-            
-            if isinstance(rid, list): rid = rid[0]
-            if isinstance(rtype, list): rtype = rtype[0]
-            if isinstance(rix_raw, list): rix_raw = rix_raw[0]
-            
-            rix = int(rix_raw)
-            
-            # 1. Register in Database via FastAPI
-            resp = requests.patch(f"{BACKEND_URL}/chat/{rid}/rate", json={"rating": rtype}, timeout=5)
-            resp.raise_for_status()
-            
-            # 2. Update local UI state
-            st.session_state.ratings[rix] = rtype
-            
-        except Exception as e:
-            st.error(f"Failed to register rating: {e}")
-            
-        # 3. Clean URL and rerun
-        st.query_params.clear()
-        st.rerun()
 
     st.markdown(CHAT_CSS, unsafe_allow_html=True)
-    st.markdown(
-        f"""
-        <script>
-            window.backendUrl = "{BACKEND_URL}";
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
 
     # Header
     st.markdown("""
     <div class="sa-header">
         <div class="sa-header-left">
-            <div class="sa-avatar">&#9672;</div>
+            <div class="sa-avatar">◈</div>
             <div>
                 <div class="sa-header-name">SalesAssist</div>
                 <div class="sa-status">
@@ -518,31 +432,37 @@ if st.session_state.initialized:
                     short_url = surl[:45] + ("..." if len(surl) > 45 else "")
                     cards += f'<a class="source-card" href="{surl}" target="_blank"><div class="source-icon">&#127760;</div><div><div class="source-title">{stitle}</div><div class="source-sub">{short_url}</div></div></a>'
                 count = len(db_sources) + len(internet_sources)
-                source_cards_html = f'<details class="sources-section"><summary class="sources-toggle">View Sources ({count})</summary><div style="margin-top:6px">{cards}</div></details>'
-
-            up_class   = "liked"    if rating == "yes"   else ""
-            down_class = "disliked" if rating == "no" else ""
-
-            # Get message_id
-            m_id = msg.get("message_id", "None")
+                source_cards_html = f'<details class="sources-section"><summary class="sources-toggle">◈ View Sources ({count})</summary><div style="margin-top:6px">{cards}</div></details>'
 
             bot_bubble_html = f"""
 <div class="msg-row-bot">
-<div class="bot-mini-avatar">&#9672;</div>
+<div class="bot-mini-avatar">◈</div>
 <div class="bubble-bot-wrap">
-<div class="bubble-bot" style="position:relative">
-<div class="copy-btn" onclick="copyMsg(this.closest('.bubble-bot').innerText.replace(this.innerText,'').trim())">copy</div>
-{content}</div>
+<div class="bubble-bot">{content}</div>
 {source_cards_html}
-<div class="bubble-meta"><span class="bubble-time">{ts}</span></div>
-<div class="rating-row">
-  <span class="rating-label">Was this helpful?</span>
-  <button class="rate-btn {up_class}" onclick="rateMsg(this,'up','{m_id}', {i})">&#128077; Yes</button>
-  <button class="rate-btn {down_class}" onclick="rateMsg(this,'down','{m_id}', {i})">&#128078; No</button>
+<div class="bubble-meta">
+<span class="bubble-time">{ts}</span>
 </div>
 </div>
 </div>"""
             st.markdown(bot_bubble_html, unsafe_allow_html=True)
+
+            # Rating buttons
+            col_gap, col_label, col_up, col_dn, col_rest = st.columns([4, 2, 0.45, 0.45, 3])
+            with col_label:
+                st.markdown('<div style="font-family:\'DM Sans\';font-size:.7rem;color:#94A3B8;margin-top:7px;text-align:right;">Was this helpful?</div>', unsafe_allow_html=True)
+            with col_up:
+                up_type = "primary" if rating == "yes" else "secondary"
+                if st.button("👍", key=f"up_{i}", type=up_type):
+                    st.session_state.ratings[i] = "yes"
+                    rate_message(st.session_state.message_ids.get(i), "yes")
+                    st.rerun()
+            with col_dn:
+                dn_type = "primary" if rating == "no" else "secondary"
+                if st.button("👎", key=f"dn_{i}", type=dn_type):
+                    st.session_state.ratings[i] = "no"
+                    rate_message(st.session_state.message_ids.get(i), "no")
+                    st.rerun()
 
             # Suggested chips after last bot message
             if i == len(st.session_state.messages) - 1:
@@ -558,8 +478,7 @@ if st.session_state.initialized:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── Input ──
-    # Change user message time
+# ── Input ──
 if prompt := st.chat_input("Ask me anything..."):
     now_ist = datetime.datetime.now(IST).strftime("%I:%M %p") # Use IST
     st.session_state.messages.append({
@@ -575,7 +494,8 @@ if st.session_state.initialized and len(st.session_state.messages) > 0:
     if last_msg["role"] == "user":
         typing_ph = st.empty()
         with typing_ph:
-            st.markdown('<div class="chat-area" style="padding-top:0;padding-bottom:0;"><div class="typing-bubble"><div class="bot-mini-avatar">&#9672;</div><div class="typing-dots"><span></span><span></span><span></span></div></div></div>', unsafe_allow_html=True)
+            st.markdown('<div class="chat-area" style="padding-top:0;padding-bottom:0;"><div class="typing-bubble"><div class="bot-mini-avatar">◈</div><div class="typing-dots"><span></span><span></span><span></span></div></div></div>', unsafe_allow_html=True)
+        
         data = send_message(last_msg["content"])
         typing_ph.empty()
 
@@ -592,10 +512,9 @@ if st.session_state.initialized and len(st.session_state.messages) > 0:
             "time"            : datetime.datetime.now(IST).strftime("%I:%M %p"),
             "db_sources"      : db_sources,
             "internet_sources": internet_sources,
-            "message_id"      : message_id, # Store ID directly here
         })
 
-        # Keep legacy store just in case
+        # Store message_id so rating buttons can call /rate endpoint
         st.session_state.message_ids[idx] = message_id
         st.session_state.ratings[idx]     = None
         st.rerun()

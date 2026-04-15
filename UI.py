@@ -4,6 +4,7 @@ import time
 import base64
 import datetime
 import textwrap
+import json
 
 # Define Indian Standard Time (UTC+5:30)
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
@@ -440,7 +441,7 @@ if st.session_state.initialized:
     st.markdown(
         f"""
         <script>
-            window.messageIds = {st.json.dumps(st.session_state.message_ids)};
+            window.messageIds = {json.dumps(st.session_state.message_ids)};
             window.backendUrl = "{BACKEND_URL}";
         </script>
         """,

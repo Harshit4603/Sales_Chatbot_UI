@@ -198,6 +198,15 @@ function rateMsg(btn, type, msgIdx) {
         showToast("We'll keep improving 🙏");
     }
     setTimeout(function(){ btn.classList.remove('liked-anim','disliked-anim'); }, 500);
+
+    // ✅ ADD THIS BLOCK RIGHT HERE
+    fetch(`${window.backendUrl}/chat/${window.messageIds[msgIdx]}/rate`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            rating: type === 'up' ? "thumbs_up" : "thumbs_down"
+        })
+    });
 }
 function copyMsg(text) {
     navigator.clipboard.writeText(text).then(function(){ showToast('Copied ✓'); });
@@ -428,6 +437,15 @@ if not st.session_state.initialized:
 if st.session_state.initialized:
 
     st.markdown(CHAT_CSS, unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <script>
+            window.messageIds = {st.json.dumps(st.session_state.message_ids)};
+            window.backendUrl = "{BACKEND_URL}";
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
 
     # Header
     st.markdown("""
@@ -443,7 +461,7 @@ if st.session_state.initialized:
             </div>
         </div>
         <div class="sa-header-actions">
-            <div class="sa-pill" onclick="sendChip('Start a new topic')">+ New topic</div>
+            <div class="sa-pill" onclick="window.location.reload()">+ New topic</div>
             <div class="sa-pill" onclick="copyMsg(document.querySelector('.bubble-bot')?.innerText||'')">&#x2197; Copy last</div>
         </div>
     </div>
@@ -495,19 +513,6 @@ if st.session_state.initialized:
 </div>
 </div>"""
             st.markdown(bot_bubble_html, unsafe_allow_html=True)
-
-            # Streamlit hidden buttons for backend rating calls
-            col_gap, col_up, col_dn, col_rest = st.columns([6, 0.45, 0.45, 3])
-            with col_up:
-                if st.button("👍", key=f"up_{i}", type="secondary"):
-                    st.session_state.ratings[i] = "up"
-                    rate_message(st.session_state.message_ids.get(i), "thumbs_up")
-                    st.rerun()
-            with col_dn:
-                if st.button("👎", key=f"dn_{i}", type="secondary"):
-                    st.session_state.ratings[i] = "down"
-                    rate_message(st.session_state.message_ids.get(i), "thumbs_down")
-                    st.rerun()
 
             # Suggested chips after last bot message
             if i == len(st.session_state.messages) - 1:

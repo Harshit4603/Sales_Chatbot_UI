@@ -183,7 +183,9 @@ CHAT_CSS = """
 <style>
 """ + GLOBAL_CSS + """
 
-.stApp { background: var(--bg-page) !important; }
+.stApp { 
+    background: linear-gradient(135deg, #F0F2F8 0%, #E2E8F0 100%) !important; 
+}
 
 .sa-header {
     background: var(--navy); padding: 18px 28px 14px;
@@ -210,7 +212,12 @@ CHAT_CSS = """
     width: 6px; height: 6px; border-radius: 50%;
     background: var(--green); animation: dot-p 2s ease-in-out infinite;
 }
-.chat-area { max-width: 780px; margin: 0 auto; padding: 28px 20px 100px; }
+.chat-area { 
+    max-width: 780px; 
+    margin: 0 auto; 
+    padding: 28px 20px 100px;
+    backdrop-filter: blur(10px);
+}
 
 .msg-row-bot {
     display: flex; gap: 10px; align-items: flex-end;
@@ -363,36 +370,44 @@ if st.session_state.initialized:
 
         if role == "assistant":
             rating       = st.session_state.ratings.get(i)
-            liked_cls    = "liked"    if rating == "up"   else ""
-            disliked_cls = "disliked" if rating == "down" else ""
+            
+            # Reactive Feedback: Inject CSS to color buttons if they are clicked
+            if rating == "up":
+                st.markdown(f'<style>button[key="up_{i}"] {{ background-color: var(--accent2) !important; color: white !important; }}</style>', unsafe_allow_html=True)
+            elif rating == "down":
+                st.markdown(f'<style>button[key="dn_{i}"] {{ background-color: var(--red) !important; color: white !important; }}</style>', unsafe_allow_html=True)
 
-            # Build sources HTML
+            # Build sources HTML (Toggleable dropdown)
             db_sources       = msg.get("db_sources", [])
             internet_sources = msg.get("internet_sources", [])
             sources_html     = ""
 
             if db_sources or internet_sources:
-                sources_html = '<div class="sources-row">'
+                sources_html = """
+                <details style="margin-top: 10px; cursor: pointer;">
+                    <summary style="font-size: .75rem; color: var(--accent2); font-weight: 500;">View Sources</summary>
+                    <ul style="margin-top: 8px; padding-left: 15px; list-style-type: none;">
+                """
                 for src in db_sources:
-                    sources_html += f'<span class="source-badge db">📄 {src}</span>'
+                    sources_html += f'<li style="font-size: .72rem; color: var(--navy2); margin-bottom: 4px;">📄 {src}</li>'
                 for src in internet_sources:
                     title = src.get("title", "Web")
                     url   = src.get("url", "#")
-                    sources_html += f'<a class="source-badge" href="{url}" target="_blank">🌐 {title}</a>'
-                sources_html += '</div>'
+                    sources_html += f'<li style="font-size: .72rem; color: var(--navy2); margin-bottom: 4px;">🌐 <a href="{url}" target="_blank" style="color: var(--accent2); text-decoration: none;">{title}</a></li>'
+                sources_html += '</ul></details>'
 
             st.markdown(f"""
-<div class="msg-row-bot">
-<div class="bot-mini-avatar">◈</div>
-<div class="bubble-bot-wrap">
-<div class="bubble-bot">{content}</div>
-{sources_html}
-<div class="bubble-meta">
-<span class="bubble-time">{ts}</span>
-</div>
-</div>
-</div>
-""", unsafe_allow_html=True)
+            <div class="msg-row-bot">
+                <div class="bot-mini-avatar">◈</div>
+                <div class="bubble-bot-wrap">
+                    <div class="bubble-bot">{content}</div>
+                    {sources_html}
+                    <div class="bubble-meta">
+                        <span class="bubble-time">{ts}</span>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
             # Rating buttons
             col_gap, col_up, col_dn, col_rest = st.columns([6, 0.45, 0.45, 3])
@@ -418,8 +433,7 @@ if st.session_state.initialized:
 
     # ── Input ──
     if prompt := st.chat_input("Ask me anything about products, pricing, or deals..."):
-        # Use IST (UTC+5:30)
-        now = (datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)).strftime("%I:%M %p")
+        now = datetime.datetime.now().strftime("%I:%M %p")
 
         st.session_state.messages.append({
             "role": "user", "content": prompt, "time": now,
@@ -445,7 +459,7 @@ if st.session_state.initialized and len(st.session_state.messages) > 0:
         st.session_state.messages.append({
             "role"            : "assistant",
             "content"         : answer,
-            "time"            : (datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)).strftime("%I:%M %p"),
+            "time"            : datetime.datetime.now().strftime("%I:%M %p"),
             "db_sources"      : db_sources,
             "internet_sources": internet_sources,
         })

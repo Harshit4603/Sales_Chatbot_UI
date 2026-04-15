@@ -3,6 +3,7 @@ import requests
 import time
 import base64
 import datetime
+import textwrap
 
 # =========================
 # CONFIGURATION
@@ -369,59 +370,69 @@ if st.session_state.initialized:
         content = msg["content"]
 
         if role == "assistant":
-            rating       = st.session_state.ratings.get(i)
-            
-            # Reactive Feedback: Inject CSS to color buttons if they are clicked
-            if rating == "up":
-                st.markdown(f'<style>button[key="up_{i}"] {{ background-color: var(--accent2) !important; color: white !important; }}</style>', unsafe_allow_html=True)
-            elif rating == "down":
-                st.markdown(f'<style>button[key="dn_{i}"] {{ background-color: var(--red) !important; color: white !important; }}</style>', unsafe_allow_html=True)
-
-            # Build sources HTML (Toggleable dropdown)
-            db_sources       = msg.get("db_sources", [])
+            rating = st.session_state.ratings.get(i)
+            db_sources = msg.get("db_sources", [])
             internet_sources = msg.get("internet_sources", [])
-            sources_html     = ""
+            
+            # 1. Build the list items string
+            items_html = ""
+            for src in db_sources:
+                items_html += f'<li style="font-size: .72rem; color: #111827; margin-bottom: 4px;">📄 {src}</li>'
+            for src in internet_sources:
+                title = src.get("title", "Web")
+                url = src.get("url", "#")
+                items_html += f'<li style="font-size: .72rem; color: #111827; margin-bottom: 4px;">🌐 <a href="{url}" target="_blank" style="color: #3B82F6; text-decoration: none;">{title}</a></li>'
 
-            if db_sources or internet_sources:
-                sources_html = """
-                <details style="margin-top: 10px; cursor: pointer;">
-                    <summary style="font-size: .75rem; color: var(--accent2); font-weight: 500;">View Sources</summary>
-                    <ul style="margin-top: 8px; padding-left: 15px; list-style-type: none;">
-                """
-                for src in db_sources:
-                    sources_html += f'<li style="font-size: .72rem; color: var(--navy2); margin-bottom: 4px;">📄 {src}</li>'
-                for src in internet_sources:
-                    title = src.get("title", "Web")
-                    url   = src.get("url", "#")
-                    sources_html += f'<li style="font-size: .72rem; color: var(--navy2); margin-bottom: 4px;">🌐 <a href="{url}" target="_blank" style="color: var(--accent2); text-decoration: none;">{title}</a></li>'
-                sources_html += '</ul></details>'
+            # 2. Build the toggleable sources block
+            sources_html = ""
+            if items_html:
+                sources_html = textwrap.dedent(f"""
+                    <details style="margin-top: 10px; cursor: pointer;">
+                        <summary style="font-size: .75rem; color: #3B82F6; font-weight: 500;">◈ View Sources</summary>
+                        <ul style="margin-top: 8px; padding-left: 15px; list-style-type: none;">
+                            {items_html}
+                        </ul>
+                    </details>
+                """)
 
-            st.markdown(f"""
-            <div class="msg-row-bot">
-                <div class="bot-mini-avatar">◈</div>
-                <div class="bubble-bot-wrap">
-                    <div class="bubble-bot">{content}</div>
-                    {sources_html}
-                    <div class="bubble-meta">
-                        <span class="bubble-time">{ts}</span>
+            # 3. Main Message Bubble (Wrapped in dedent)
+            bot_bubble_html = textwrap.dedent(f"""
+                <div class="msg-row-bot">
+                    <div class="bot-mini-avatar">◈</div>
+                    <div class="bubble-bot-wrap">
+                        <div class="bubble-bot">{content}</div>
+                        {sources_html}
+                        <div class="bubble-meta">
+                            <span class="bubble-time">{ts}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+            """)
+            st.markdown(bot_bubble_html, unsafe_allow_html=True)
 
-            # Rating buttons
+            # 4. Rating buttons with color feedback
             col_gap, col_up, col_dn, col_rest = st.columns([6, 0.45, 0.45, 3])
+            
             with col_up:
-                if st.button("👍", key=f"up_{i}", help="Helpful"):
+                # Use "primary" type to signal the state
+                up_type = "primary" if rating == "up" else "secondary"
+                if st.button("👍", key=f"up_{i}", help="Helpful", type=up_type):
                     st.session_state.ratings[i] = "up"
                     rate_message(st.session_state.message_ids.get(i), "thumbs_up")
                     st.rerun()
+                # Apply custom Blue color for Liked
+                if rating == "up":
+                    st.markdown(f'<style>div[data-testid="stHorizontalBlock"] button[key="up_{i}"] {{ background-color: #3B82F6 !important; color: white !important; border: none !important; }}</style>', unsafe_allow_html=True)
+
             with col_dn:
-                if st.button("👎", key=f"dn_{i}", help="Not helpful"):
+                dn_type = "primary" if rating == "down" else "secondary"
+                if st.button("👎", key=f"dn_{i}", help="Not helpful", type=dn_type):
                     st.session_state.ratings[i] = "down"
                     rate_message(st.session_state.message_ids.get(i), "thumbs_down")
                     st.rerun()
-
+                # Apply custom Red color for Disliked
+                if rating == "down":
+                    st.markdown(f'<style>div[data-testid="stHorizontalBlock"] button[key="dn_{i}"] {{ background-color: #EF5350 !important; color: white !important; border: none !important; }}</style>', unsafe_allow_html=True)
         else:
             st.markdown(f"""
             <div class="msg-row-user">

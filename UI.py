@@ -5,6 +5,8 @@ import base64
 import datetime
 import textwrap
 
+# Define Indian Standard Time (UTC+5:30)
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 # =========================
 # CONFIGURATION
 # =========================
@@ -374,7 +376,7 @@ if st.session_state.initialized:
             db_sources = msg.get("db_sources", [])
             internet_sources = msg.get("internet_sources", [])
             
-            # 1. Build the list items string
+            # 1. Build Source Items
             items_html = ""
             for src in db_sources:
                 items_html += f'<li style="font-size: .72rem; color: #111827; margin-bottom: 4px;">📄 {src}</li>'
@@ -383,56 +385,51 @@ if st.session_state.initialized:
                 url = src.get("url", "#")
                 items_html += f'<li style="font-size: .72rem; color: #111827; margin-bottom: 4px;">🌐 <a href="{url}" target="_blank" style="color: #3B82F6; text-decoration: none;">{title}</a></li>'
 
-            # 2. Build the toggleable sources block
+            # 2. Build Sources Dropdown (FLUSH LEFT)
             sources_html = ""
             if items_html:
-                sources_html = textwrap.dedent(f"""
-                    <details style="margin-top: 10px; cursor: pointer;">
-                        <summary style="font-size: .75rem; color: #3B82F6; font-weight: 500;">◈ View Sources</summary>
-                        <ul style="margin-top: 8px; padding-left: 15px; list-style-type: none;">
-                            {items_html}
-                        </ul>
-                    </details>
-                """)
+                sources_html = f"""
+<details style="margin-top: 10px; cursor: pointer;">
+<summary style="font-size: .75rem; color: #3B82F6; font-weight: 500;">◈ View Sources</summary>
+<ul style="margin-top: 8px; padding-left: 15px; list-style-type: none;">
+{items_html}
+</ul>
+</details>"""
 
-            # 3. Main Message Bubble (Wrapped in dedent)
-            bot_bubble_html = textwrap.dedent(f"""
-                <div class="msg-row-bot">
-                    <div class="bot-mini-avatar">◈</div>
-                    <div class="bubble-bot-wrap">
-                        <div class="bubble-bot">{content}</div>
-                        {sources_html}
-                        <div class="bubble-meta">
-                            <span class="bubble-time">{ts}</span>
-                        </div>
-                    </div>
-                </div>
-            """)
+            # 3. Main Message Bubble (FLUSH LEFT)
+            # This must stay at the far left margin to avoid code blocks
+            bot_bubble_html = f"""
+<div class="msg-row-bot">
+<div class="bot-mini-avatar">◈</div>
+<div class="bubble-bot-wrap">
+<div class="bubble-bot">{content}</div>
+{sources_html}
+<div class="bubble-meta">
+<span class="bubble-time">{ts}</span>
+</div>
+</div>
+</div>"""
             st.markdown(bot_bubble_html, unsafe_allow_html=True)
 
-            # 4. Rating buttons with color feedback
+            # 4. Rating buttons
             col_gap, col_up, col_dn, col_rest = st.columns([6, 0.45, 0.45, 3])
-            
             with col_up:
-                # Use "primary" type to signal the state
                 up_type = "primary" if rating == "up" else "secondary"
-                if st.button("👍", key=f"up_{i}", help="Helpful", type=up_type):
+                if st.button("👍", key=f"up_{i}", type=up_type):
                     st.session_state.ratings[i] = "up"
                     rate_message(st.session_state.message_ids.get(i), "thumbs_up")
                     st.rerun()
-                # Apply custom Blue color for Liked
                 if rating == "up":
-                    st.markdown(f'<style>div[data-testid="stHorizontalBlock"] button[key="up_{i}"] {{ background-color: #3B82F6 !important; color: white !important; border: none !important; }}</style>', unsafe_allow_html=True)
+                    st.markdown(f'<style>button[key="up_{i}"] {{ background-color: #3B82F6 !important; color: white !important; border: none !important; }}</style>', unsafe_allow_html=True)
 
             with col_dn:
                 dn_type = "primary" if rating == "down" else "secondary"
-                if st.button("👎", key=f"dn_{i}", help="Not helpful", type=dn_type):
+                if st.button("👎", key=f"dn_{i}", type=dn_type):
                     st.session_state.ratings[i] = "down"
                     rate_message(st.session_state.message_ids.get(i), "thumbs_down")
                     st.rerun()
-                # Apply custom Red color for Disliked
                 if rating == "down":
-                    st.markdown(f'<style>div[data-testid="stHorizontalBlock"] button[key="dn_{i}"] {{ background-color: #EF5350 !important; color: white !important; border: none !important; }}</style>', unsafe_allow_html=True)
+                    st.markdown(f'<style>button[key="dn_{i}"] {{ background-color: #EF5350 !important; color: white !important; border: none !important; }}</style>', unsafe_allow_html=True)
         else:
             st.markdown(f"""
             <div class="msg-row-user">
@@ -443,13 +440,13 @@ if st.session_state.initialized:
     st.markdown("</div>", unsafe_allow_html=True)
 
     # ── Input ──
-    if prompt := st.chat_input("Ask me anything about products, pricing, or deals..."):
-        now = datetime.datetime.now().strftime("%I:%M %p")
-
-        st.session_state.messages.append({
-            "role": "user", "content": prompt, "time": now,
-        })
-        st.rerun()
+    # Change user message time
+if prompt := st.chat_input("Ask me anything..."):
+    now_ist = datetime.datetime.now(IST).strftime("%I:%M %p") # Use IST
+    st.session_state.messages.append({
+        "role": "user", "content": prompt, "time": now_ist,
+    })
+    st.rerun()
 
 # ── Generate response after rerun ────────────────────────────────────────────
 
@@ -470,7 +467,7 @@ if st.session_state.initialized and len(st.session_state.messages) > 0:
         st.session_state.messages.append({
             "role"            : "assistant",
             "content"         : answer,
-            "time"            : datetime.datetime.now().strftime("%I:%M %p"),
+            "time"            : datetime.datetime.now(IST).strftime("%I:%M %p"),
             "db_sources"      : db_sources,
             "internet_sources": internet_sources,
         })

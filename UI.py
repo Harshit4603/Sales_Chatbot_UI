@@ -111,16 +111,27 @@ function copyMsg(text) {
     });
 }
 function sendChip(text) {
-    var inp = parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]') || document.querySelector('textarea');
+    // Try multiple selector strategies
+    var inp = parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]')
+           || parent.document.querySelector('textarea')
+           || document.querySelector('textarea[data-testid="stChatInputTextArea"]')
+           || document.querySelector('textarea');
+    
     if (!inp) return;
+
+    // Focus first, then set value
+    inp.focus();
     var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
     setter.call(inp, text);
     inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+
     setTimeout(function(){
-        var form = inp.closest('form');
-        var btn = form ? form.querySelector('button[type="submit"]') : inp.parentElement.querySelector('button');
+        // Try finding submit button more reliably
+        var btn = parent.document.querySelector('button[data-testid="stChatInputSubmitButton"]')
+               || document.querySelector('button[data-testid="stChatInputSubmitButton"]');
         if (btn) btn.click();
-    }, 80);
+    }, 150);  // slightly longer delay than 80ms
 }
 </script>
 """
@@ -466,7 +477,7 @@ if st.session_state.initialized:
 
             # Suggested chips after last bot message
             if i == len(st.session_state.messages) - 1:
-                CHIP_LABELS = ["Show pricing breakdown", "Compare with competitor", "Draft a follow-up email", "Summarise key benefits"]
+                CHIP_LABELS = msg.get("followups", [])
                 chips_markup = "".join(f'<div class="chip" onclick="sendChip(\'{c}\')">{c}</div>' for c in CHIP_LABELS)
                 st.markdown(f'<div class="chips-row">{chips_markup}</div>', unsafe_allow_html=True)
         else:
@@ -507,13 +518,14 @@ if st.session_state.initialized and len(st.session_state.messages) > 0:
         idx = len(st.session_state.messages)
 
         st.session_state.messages.append({
-            "role"            : "assistant",
-            "content"         : answer,
-            "time"            : datetime.datetime.now(IST).strftime("%I:%M %p"),
-            "db_sources"      : db_sources,
-            "internet_sources": internet_sources,
-            "message_id"      : message_id,
-        })
+    "role"            : "assistant",
+    "content"         : answer,
+    "time"            : datetime.datetime.now(IST).strftime("%I:%M %p"),
+    "db_sources"      : db_sources,
+    "internet_sources": internet_sources,
+    "message_id"      : message_id,
+    "followups"       : data.get("followups", []),   # ← add this
+})
 
         # Store message_id so rating buttons can call /rate endpoint
         st.session_state.message_ids[idx] = message_id

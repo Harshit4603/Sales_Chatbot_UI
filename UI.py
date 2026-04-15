@@ -512,6 +512,18 @@ if st.session_state.initialized and len(st.session_state.messages) > 0:
             "time"            : datetime.datetime.now(IST).strftime("%I:%M %p"),
             "db_sources"      : db_sources,
             "internet_sources": internet_sources,
+            "message_id"      : message_id,
+        })
+
+        # Store message_id so rating buttons can call /rate endpoint
+        st.session_state.message_ids[idx] = message_id
+        st.session_state.ratings[idx]     = None
+        st.rerun()
+        st.session_state.messages.append({
+            "content"         : answer,
+            "time"            : datetime.datetime.now(IST).strftime("%I:%M %p"),
+            "db_sources"      : db_sources,
+            "internet_sources": internet_sources,
         })
 
         # Store message_id so rating buttons can call /rate endpoint

@@ -1,0 +1,8 @@
+requests
+streamlit
+pinecone
+langchain
+langchain-community
+sentence-transformers
+groq
+python-dotenv

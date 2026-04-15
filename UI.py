@@ -100,6 +100,77 @@ body { font-family: var(--font-sans); }
 @keyframes dot-p{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:1;transform:scale(1.45)}}
 """
 
+SCRIPTS = """
+<script>
+function rateMsg(btn, type, msgIdx) {
+    var row = btn.parentElement;
+    row.querySelectorAll('.rate-btn').forEach(function(b){
+        b.classList.remove('liked','disliked','liked-anim','disliked-anim','ripple');
+    });
+    void btn.offsetWidth;
+    btn.classList.add('ripple');
+    setTimeout(function(){ btn.classList.remove('ripple'); }, 450);
+    if (type === 'up') {
+        btn.classList.add('liked','liked-anim');
+        showToast('Thanks for the feedback! 👍');
+    } else {
+        btn.classList.add('disliked','disliked-anim');
+        showToast("We'll keep improving 🙏");
+    }
+    setTimeout(function(){ btn.classList.remove('liked-anim','disliked-anim'); }, 500);
+
+    const messageId = window.messageIds[msgIdx];
+    if (!messageId) {
+        console.error("No message_id found for index:", msgIdx);
+        return;
+    }
+
+    console.log(`Sending ${type} rating for message ${messageId}`);
+
+    fetch(`${window.backendUrl}/chat/${messageId}/rate`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            rating: type === 'up' ? "thumbs_up" : "thumbs_down"
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            console.error("Failed to register rating:", response.statusText);
+        } else {
+            console.log("Rating registered successfully!");
+        }
+    })
+    .catch(error => {
+        console.error("Error sending rating:", error);
+    });
+}
+function copyMsg(text) {
+    navigator.clipboard.writeText(text).then(function(){ showToast('Copied ✓'); });
+}
+function showToast(msg) {
+    var old = document.querySelector('.feedback-toast');
+    if (old) old.remove();
+    var t = document.createElement('div');
+    t.className = 'feedback-toast'; t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function(){ t.remove(); }, 2000);
+}
+function sendChip(text) {
+    var inp = parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]') || document.querySelector('textarea');
+    if (!inp) return;
+    var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(inp, text);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    setTimeout(function(){
+        var form = inp.closest('form');
+        var btn = form ? form.querySelector('button[type="submit"]') : inp.parentElement.querySelector('button');
+        if (btn) btn.click();
+    }, 80);
+}
+</script>
+"""
+
 # ── Loading Screen CSS ────────────────────────────────────────────────────────
 
 LOADING_CSS = """
@@ -181,58 +252,6 @@ LOADING_CSS = """
 @keyframes fade-up { to { opacity:1; transform:translateY(0); } }
 
 </style>
-
-<script>
-function rateMsg(btn, type, msgIdx) {
-    var row = btn.parentElement;
-    row.querySelectorAll('.rate-btn').forEach(function(b){
-        b.classList.remove('liked','disliked','liked-anim','disliked-anim','ripple');
-    });
-    void btn.offsetWidth;
-    btn.classList.add('ripple');
-    setTimeout(function(){ btn.classList.remove('ripple'); }, 450);
-    if (type === 'up') {
-        btn.classList.add('liked','liked-anim');
-        showToast('Thanks for the feedback! 👍');
-    } else {
-        btn.classList.add('disliked','disliked-anim');
-        showToast("We'll keep improving 🙏");
-    }
-    setTimeout(function(){ btn.classList.remove('liked-anim','disliked-anim'); }, 500);
-
-    // ✅ ADD THIS BLOCK RIGHT HERE
-    fetch(`${window.backendUrl}/chat/${window.messageIds[msgIdx]}/rate`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            rating: type === 'up' ? "thumbs_up" : "thumbs_down"
-        })
-    });
-}
-function copyMsg(text) {
-    navigator.clipboard.writeText(text).then(function(){ showToast('Copied ✓'); });
-}
-function showToast(msg) {
-    var old = document.querySelector('.feedback-toast');
-    if (old) old.remove();
-    var t = document.createElement('div');
-    t.className = 'feedback-toast'; t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(function(){ t.remove(); }, 2000);
-}
-function sendChip(text) {
-    var inp = parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]') || document.querySelector('textarea');
-    if (!inp) return;
-    var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-    setter.call(inp, text);
-    inp.dispatchEvent(new Event('input', { bubbles: true }));
-    setTimeout(function(){
-        var form = inp.closest('form');
-        var btn = form ? form.querySelector('button[type="submit"]') : inp.parentElement.querySelector('button');
-        if (btn) btn.click();
-    }, 80);
-}
-</script>
 """
 
 # ── Chat Screen CSS ───────────────────────────────────────────────────────────
@@ -389,6 +408,9 @@ if "messages"     not in st.session_state: st.session_state.messages     = []
 if "ratings"      not in st.session_state: st.session_state.ratings      = {}
 if "session_id"   not in st.session_state: st.session_state.session_id   = None  # ← FastAPI session
 if "message_ids"  not in st.session_state: st.session_state.message_ids  = {}    # {msg_index: message_id}
+
+# ── RENDER SCRIPTS ──
+st.markdown(SCRIPTS, unsafe_allow_html=True)
 
 # ── LOADING SCREEN ────────────────────────────────────────────────────────────
 
